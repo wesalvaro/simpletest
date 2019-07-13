@@ -16,7 +16,7 @@ class Value(object):
     elif isinstance(self.value, types.ModuleType):
       return str(self.name)
     else:
-      return '%s [%s]' % (self.name, self.value)
+      return '%s <%s>' % (self.name, self.value)
 
 
 class Result(object):
@@ -24,7 +24,7 @@ class Result(object):
     self.value, self.args, self.action = value, args, action
 
   def __str__(self):
-    return '%s(%s) [%s]' % (
+    return '%s(%s) <%s>' % (
       self.action,
       ', '.join(str(a) for a in self.args),
       self.value
@@ -47,7 +47,7 @@ class Attr(object):
     self.value, self.name, self.parent = value, name, parent
 
   def __str__(self):
-    return '%s.%s [%s]' % (self.parent, self.name, self.value)
+    return '%s.%s <%s>' % (self.parent, self.name, self.value)
 
 
 class BytecodeRunner(object):
