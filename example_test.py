@@ -4,15 +4,18 @@ import math
 
 
 class ExampleTest(simpletest.TestCase, testing=example.Example):
+  def setup(self):
+    self.ex = example.Example()
+
   def negate(self):
-    ex = example.Example()
+    ex = self.ex
     ex.negate(True) is False
     ex.negate(False) is not None
     ex.negate(False) is False
     ex.negate(True) is None
 
   def add5(self):
-    ex = example.Example()
+    ex = self.ex
     ex.add5(1) == 6
     ex.add5(2) == 6
     math.pi > ex.add5(1)

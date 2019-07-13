@@ -52,7 +52,7 @@ class Attr(object):
 
 class BytecodeRunner(object):
 
-  def __init__(self, func):
+  def __init__(self, func, func_self=None):
     bc = dis.Bytecode(func)
     self._instructions = (i for i in bc)
     self._filename = bc.codeobj.co_filename
@@ -60,8 +60,9 @@ class BytecodeRunner(object):
     self._symbols = {}
     self._stack = []
     self._symbols.update(func.__globals__)
-    if '__self__' in dir(func):
-      self._symbols.update({'self': func.__self__})
+    func_self = func_self or getattr(func, '__self__', None)
+    if func_self:
+      self._symbols.update({'self': func_self})
     self.return_value = sentinel.NOT_RUN
 
   def run(self):
@@ -173,8 +174,8 @@ class TestCaseBytecodeRunner(BytecodeRunner):
     'in': 'to be contained in',
   }
 
-  def __init__(self, func):
-    super().__init__(func)
+  def __init__(self, func, func_self):
+    super().__init__(func, func_self=func_self)
     self.errors = []
 
   def op_COMPARE_OP(self, i):
@@ -217,9 +218,11 @@ class TestCaseMeta(type):
     if testing and routines_untested:
       print('Untested routines: %s' % ', '.join(routines_untested))
     test_methods = set(k for k in dct.keys() if not k.startswith('_'))
-    if test_methods - set(tests.keys()) - {'run', 'setup', 'teardown'}:
-      print('Extra test methods: %s' %
-            ', '.join(test_methods - set(tests.keys())))
+    extra_test_methods = test_methods - set(tests.keys()) - {
+      'run', 'setup', 'teardown',
+    }
+    if extra_test_methods:
+      print('Extra test methods: %s' % ', '.join(extra_test_methods))
     x._tests = tests
     return x
 
@@ -227,11 +230,23 @@ class TestCaseMeta(type):
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
 
+  def setup(self):
+    """Called once before each test."""
+
+  def teardown(self):
+    """Called once after each test."""
+
   def run(self):
     failed = 0
     for k in sorted(self._tests.keys()):
-      bcr = TestCaseBytecodeRunner(self._tests[k])
-      bcr.run()
+      self.setup()
+      bcr = TestCaseBytecodeRunner(self._tests[k], self)
+      try:
+        bcr.run()
+      except Exception as e:
+        failed += 1
+        print(e)
+      self.teardown()
       failed += 1 if bcr.errors else 0
       if failed:
         print(k)
