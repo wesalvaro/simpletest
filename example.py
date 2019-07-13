@@ -8,5 +8,5 @@ class Example(object):
   def add5(self, value):
     return value + 5
 
-  def appendSuffix(self, value):
+  def untested_method(self, value):
     return value + 'ish'

@@ -165,13 +165,13 @@ class BytecodeRunner(object):
 
 class TestCaseBytecodeRunner(BytecodeRunner):
   CODES = {
-    '==': 'to equal',
-    'is': 'to be',
-    '>': 'to be greater than',
-    '>=': 'to be greater than or equal to',
-    '<': 'to be less than',
-    '<=': 'to be less than or equal to',
-    'in': 'to be contained in',
+    '==': 'was not equal to',
+    'is': 'was not',
+    '>': 'was not greater than',
+    '>=': 'was not greater than or equal to',
+    '<': 'was not less than',
+    '<=': 'was not less than or equal to',
+    'in': 'was not contained in',
   }
 
   def __init__(self, func, func_self):
@@ -185,7 +185,7 @@ class TestCaseBytecodeRunner(BytecodeRunner):
     right = c.args[1]
     if c.value is False:
       self.errors.append(
-        '%s:%d -- Expected `%s` %s `%s`' % (
+        '%s:%d -- \n\t%s\n\t  %s\n\t%s\n' % (
           self._filename,
           self._line,
           left,
@@ -215,15 +215,21 @@ class TestCaseMeta(type):
       tests.update(test_methods_for_routine)
       if test_methods_for_routine:
         routines_untested -= {r}
+    meta_failures = []
     if testing and routines_untested:
-      print('Untested routines: %s' % ', '.join(routines_untested))
-    test_methods = set(k for k in dct.keys() if not k.startswith('_'))
-    extra_test_methods = test_methods - set(tests.keys()) - {
+      meta_failures.append(
+        'Untested routines: %s' % ', '.join(routines_untested)
+      )
+    test_routines = set(k for k in dct.keys() if not k.startswith('_'))
+    extra_test_routines = test_routines - set(tests.keys()) - {
       'run', 'setup', 'teardown',
     }
-    if extra_test_methods:
-      print('Extra test methods: %s' % ', '.join(extra_test_methods))
+    if extra_test_routines:
+      meta_failures.append(
+        'Extra test routines: %s' % ', '.join(extra_test_routines)
+      )
     x._tests = tests
+    x._meta_failures = meta_failures
     return x
 
 
@@ -237,6 +243,8 @@ class TestCase(metaclass=TestCaseMeta):
     """Called once after each test."""
 
   def run(self):
+    for e in self._meta_failures:
+      print(e)
     failed = 0
     for k in sorted(self._tests.keys()):
       self.setup()
@@ -249,7 +257,7 @@ class TestCase(metaclass=TestCaseMeta):
       self.teardown()
       failed += 1 if bcr.errors else 0
       if failed:
-        print(k)
+        print('%s FAILED %s\n' % (k, '*' * 20))
         for e in bcr.errors:
-          print(e)
+          print('  %s' % e)
     sys.exit(failed)
