@@ -195,33 +195,40 @@ class TestCaseBytecodeRunner(BytecodeRunner):
       )
 
 
+def _get_public_routine_names(cls):
+  return {
+    r[0]
+    for r in inspect.getmembers(cls, predicate=inspect.isroutine)
+    if not r[0].startswith('_')
+  }
+
+
+def _get_routines_with_filter(x, routine_filter):
+  return {
+    t[0]: getattr(x, t[0])
+    for t in inspect.getmembers(x, predicate=inspect.isroutine)
+    if t[0].startswith(routine_filter)
+  }
+
+
 class TestCaseMeta(type):
   def __new__(cls, name, bases, dct, testing=None):
-    if testing:
-      routines = {
-        r[0]
-        for r in inspect.getmembers(testing, predicate=inspect.isroutine)
-        if not r[0].startswith('_')
-      }
-    else:
-      routines = {'test'}
+    routines = _get_public_routine_names(testing) if testing else {'test'}
+    routines_untested = routines.copy()
     x = super().__new__(cls, name, bases, dct)
     tests = {}
-    routines_untested = routines.copy()
     for r in routines:
-      test_methods_for_routine = {
-        k: v for k, v in dct.items() if k.startswith(r)
-      }
-      tests.update(test_methods_for_routine)
-      if test_methods_for_routine:
-        routines_untested -= {r}
+      test_routines = _get_routines_with_filter(x, r)
+      tests.update(test_routines)
+      if test_routines:
+        routines_untested.remove(r)
     meta_failures = []
     if testing and routines_untested:
       meta_failures.append(
         'Untested routines: %s' % ', '.join(routines_untested)
       )
-    test_routines = set(k for k in dct.keys() if not k.startswith('_'))
-    extra_test_routines = test_routines - set(tests.keys()) - {
+    all_test_routines = _get_public_routine_names(x) or set()
+    extra_test_routines = all_test_routines - set(tests.keys()) - {
       'run', 'setup', 'teardown',
     }
     if extra_test_routines:
