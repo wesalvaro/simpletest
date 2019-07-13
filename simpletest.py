@@ -191,17 +191,25 @@ class TestCaseBytecodeRunner(BytecodeRunner):
 class TestCaseMeta(type):
   def __new__(cls, name, bases, dct, testing=None):
     if testing:
-      methods = (
+      routines = {
         r[0]
         for r in inspect.getmembers(testing, predicate=inspect.isroutine)
         if not r[0].startswith('_')
-      )
+      }
     else:
-      methods = set('test')
+      routines = {'test'}
     x = super().__new__(cls, name, bases, dct)
     x._tests = {}
-    for m in methods:
-      x._tests.update({k: v for k, v in dct.items() if k.startswith(m)})
+    routines_untested = routines.copy()
+    for r in routines:
+      test_methods_for_routine = {
+        k: v for k, v in dct.items() if k.startswith(r)
+      }
+      x._tests.update(test_methods_for_routine)
+      if test_methods_for_routine:
+        routines_untested -= {r}
+    if testing and routines_untested:
+      print('Untested routines: %s' % ', '.join(routines_untested))
     test_methods = set(k for k in dct.keys() if not k.startswith('_'))
     if test_methods - set(x._tests.keys()) - {'run', 'setup', 'teardown'}:
       print('Extra test methods: %s' %
