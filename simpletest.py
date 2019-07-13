@@ -52,7 +52,7 @@ class Attr(object):
 
 class BytecodeRunner(object):
 
-  def __init__(self, func, func_self=None):
+  def __init__(self, func):
     bc = dis.Bytecode(func)
     self._instructions = (i for i in bc)
     self._filename = bc.codeobj.co_filename
@@ -60,9 +60,8 @@ class BytecodeRunner(object):
     self._symbols = {}
     self._stack = []
     self._symbols.update(func.__globals__)
-    func_self = func_self or getattr(func, '__self__', None)
-    if func_self:
-      self._symbols.update({'self': func_self})
+    if getattr(func, '__self__', None):
+      self._symbols.update({'self': func.__self__})
     self.return_value = sentinel.NOT_RUN
 
   def run(self):
@@ -174,8 +173,8 @@ class TestCaseBytecodeRunner(BytecodeRunner):
     'in': 'was not contained in',
   }
 
-  def __init__(self, func, func_self):
-    super().__init__(func, func_self=func_self)
+  def __init__(self, func):
+    super().__init__(func)
     self.errors = []
 
   def op_COMPARE_OP(self, i):
@@ -205,7 +204,7 @@ def _get_public_routine_names(cls):
 
 def _get_routines_with_filter(x, routine_filter):
   return {
-    t[0]: getattr(x, t[0])
+    t[0]
     for t in inspect.getmembers(x, predicate=inspect.isroutine)
     if t[0].startswith(routine_filter)
   }
@@ -216,7 +215,7 @@ class TestCaseMeta(type):
     routines = _get_public_routine_names(testing) if testing else {'test'}
     routines_untested = routines.copy()
     x = super().__new__(cls, name, bases, dct)
-    tests = {}
+    tests = set()
     for r in routines:
       test_routines = _get_routines_with_filter(x, r)
       tests.update(test_routines)
@@ -225,15 +224,21 @@ class TestCaseMeta(type):
     meta_failures = []
     if testing and routines_untested:
       meta_failures.append(
-        'Untested routines: %s' % ', '.join(routines_untested)
+        'Untested routines on `%s`: %s' % (
+          testing.__name__,
+          ', '.join(routines_untested)
+        )
       )
     all_test_routines = _get_public_routine_names(x) or set()
-    extra_test_routines = all_test_routines - set(tests.keys()) - {
+    extra_test_routines = all_test_routines - tests - {
       'run', 'setup', 'teardown',
     }
     if extra_test_routines:
       meta_failures.append(
-        'Extra test routines: %s' % ', '.join(extra_test_routines)
+        'Extra test routines on `%s`: %s' % (
+          name,
+          ', '.join(extra_test_routines)
+        )
       )
     x._tests = tests
     x._meta_failures = meta_failures
@@ -253,9 +258,10 @@ class TestCase(metaclass=TestCaseMeta):
     for e in self._meta_failures:
       print(e)
     failed = 0
-    for k in sorted(self._tests.keys()):
+    for k in sorted(self._tests):
       self.setup()
-      bcr = TestCaseBytecodeRunner(self._tests[k], self)
+      f = getattr(self, k)
+      bcr = TestCaseBytecodeRunner(f)
       try:
         bcr.run()
       except Exception as e:
