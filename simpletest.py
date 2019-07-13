@@ -164,7 +164,13 @@ class BytecodeRunner(object):
 
 class TestCaseBytecodeRunner(BytecodeRunner):
   CODES = {
+    '==': 'to equal',
     'is': 'to be',
+    '>': 'to be greater than',
+    '>=': 'to be greater than or equal to',
+    '<': 'to be less than',
+    '<=': 'to be less than or equal to',
+    'in': 'to be contained in',
   }
 
   def __init__(self, func):
@@ -178,7 +184,7 @@ class TestCaseBytecodeRunner(BytecodeRunner):
     right = c.args[1]
     if c.value is False:
       self.errors.append(
-        '%s:%d -- Expected %s %s %s' % (
+        '%s:%d -- Expected `%s` %s `%s`' % (
           self._filename,
           self._line,
           left,
@@ -199,21 +205,22 @@ class TestCaseMeta(type):
     else:
       routines = {'test'}
     x = super().__new__(cls, name, bases, dct)
-    x._tests = {}
+    tests = {}
     routines_untested = routines.copy()
     for r in routines:
       test_methods_for_routine = {
         k: v for k, v in dct.items() if k.startswith(r)
       }
-      x._tests.update(test_methods_for_routine)
+      tests.update(test_methods_for_routine)
       if test_methods_for_routine:
         routines_untested -= {r}
     if testing and routines_untested:
       print('Untested routines: %s' % ', '.join(routines_untested))
     test_methods = set(k for k in dct.keys() if not k.startswith('_'))
-    if test_methods - set(x._tests.keys()) - {'run', 'setup', 'teardown'}:
+    if test_methods - set(tests.keys()) - {'run', 'setup', 'teardown'}:
       print('Extra test methods: %s' %
-            ', '.join(test_methods - set(x._tests.keys())))
+            ', '.join(test_methods - set(tests.keys())))
+    x._tests = tests
     return x
 
 
@@ -222,8 +229,8 @@ class TestCase(metaclass=TestCaseMeta):
 
   def run(self):
     failed = 0
-    for k, v in self._tests.items():
-      bcr = TestCaseBytecodeRunner(v)
+    for k in sorted(self._tests.keys()):
+      bcr = TestCaseBytecodeRunner(self._tests[k])
       bcr.run()
       failed += 1 if bcr.errors else 0
       if failed:
