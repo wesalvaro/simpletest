@@ -1,107 +1,225 @@
 import dis
 from unittest.mock import sentinel
+import collections
+import types
+import inspect
+import sys
 
 
-OPS_LOAD = {
-  'LOAD_GLOBAL': (lambda i, o: o + [i.argval]),
-  'LOAD_FAST': (lambda i, o: o + [i.argval]),
-  'LOAD_METHOD': (lambda i, o: o + ['.', i.argval]),
-  'LOAD_ATTR': (lambda i, o: o[:-1] + [o[-1] + '.' + i.argval]),
-  'LOAD_CONST': (lambda i, o: o + [i.argval]),
-}
+class Value(object):
+  def __init__(self, value, name):
+    self.value, self.name = value, name
 
-COMPARISONS = {
-  '==': 'to equal',
-  'is': 'to be',
-  'in': 'to be contained in',
-}
-
-
-def build_arguments(arg_stack, arg_count):
-  if not arg_count:
-    return arg_stack + ['()']
-  arg_list = ['(%s)' % ','.join(repr(a) for a in arg_stack[-arg_count:])]
-  return arg_stack[:-arg_count] + arg_list
-
-
-def compare_op(i, o, nn):
-  locals().update(nn)
-  left, right = o[-2], o[-1]
-  result = eval('%s %s %s' % (left, i.argval, right))
-  if not result:
-    nice_cmp = COMPARISONS.get(i.argval, i.argval)
-    return ['AssertionError("Expected %s %s %s")' % (left, nice_cmp, right,)]
-  return [None]
-
-
-OPS_EVAL = {
-  'CALL_FUNCTION': (lambda i, o, nn: build_arguments(o, i.arg)),
-  'CALL_METHOD': (lambda i, o, nn: build_arguments(o, i.arg)),
-  'COMPARE_OP': compare_op,
-}
-
-
-def store_fast(i, o, nn):
-  nn[i.argval] = o.pop()
-
-
-OPS_META = {
-  'STORE_FAST': store_fast,
-  'POP_TOP': (lambda i, o, nn: o.pop()),
-  'RETURN_VALUE': (lambda i, o, nn: sentinel.DONE),
-}
-
-
-def run(ops, names):
-  locals().update(names)
-  return eval(''.join(str(o) for o in ops))
-
-
-def test(f, symbols=None):
-  bc = dis.Bytecode(f)
-  eval_ops = []
-  names = symbols or {}
-  errors = []
-  line = 0
-  filename = bc.codeobj.co_filename
-  for i in bc:
-    line = i.starts_line if i.starts_line else line
-    opname = i.opname
-    if opname in OPS_LOAD:
-      eval_ops = OPS_LOAD[opname](i, eval_ops)
-    elif opname in OPS_EVAL:
-      eval_ops = OPS_EVAL[opname](i, eval_ops, names)
-      result = run(eval_ops, names)
-      if isinstance(result, AssertionError):
-        errors.append(("%s:%d" % (filename, line), str(result)))
-        result = None
-      eval_ops = [result]
-    elif opname in OPS_META:
-      meta = OPS_META[opname](i, eval_ops, names)
-      if meta is sentinel.DONE:
-        for err in errors:
-          print("%s -- %s" % err)
-        if errors:
-          return '[!!] Test failed %d comparisons.' % len(errors)
-        return '[OK] Pass'
-      elif meta:
-        raise AssertionError(meta)
+  def __str__(self):
+    if self.name == self.value:
+      return str(self.value)
+    elif isinstance(self.value, types.ModuleType):
+      return str(self.name)
     else:
-      raise ValueError('Unsupported operation ' + str(i))
+      return '%s [%s]' % (self.name, self.value)
+
+
+class Result(object):
+  def __init__(self, value, args, action):
+    self.value, self.args, self.action = value, args, action
+
+  def __str__(self):
+    return '%s(%s) [%s]' % (
+      self.action,
+      ', '.join(str(a) for a in self.args),
+      self.value
+    )
+
+
+Comparison = collections.namedtuple('Comparison', ['code'])
+
+
+class Method(object):
+  def __init__(self, value, name, parent):
+    self.value, self.name, self.parent = value, name, parent
+
+  def __str__(self):
+    return '%s.%s' % (self.parent.name, self.name,)
+
+
+class Attr(object):
+  def __init__(self, value, name, parent):
+    self.value, self.name, self.parent = value, name, parent
+
+  def __str__(self):
+    return '%s.%s [%s]' % (self.parent, self.name, self.value)
+
+
+class BytecodeRunner(object):
+
+  def __init__(self, func):
+    bc = dis.Bytecode(func)
+    self._instructions = (i for i in bc)
+    self._filename = bc.codeobj.co_filename
+    self._line = bc.first_line
+    self._symbols = {}
+    self._stack = []
+    self._symbols.update(func.__globals__)
+    if '__self__' in dir(func):
+      self._symbols.update({'self': func.__self__})
+    self.return_value = sentinel.NOT_RUN
+
+  def run(self):
+    for i in self._instructions:
+      self._line = i.starts_line if i.starts_line else self._line
+      #print(i)
+      op = i.opname
+      getattr(self, 'op_' + op)(i)
+      #print(self._stack)
+    return self.return_value
+
+  def op_LOAD_GLOBAL(self, i):
+    self._stack.append(Value(value=self._symbols[i.argval], name=i.argval))
+
+  def op_LOAD_FAST(self, i):
+    self._stack.append(Value(value=self._symbols[i.argval], name=i.argval))
+
+  def op_LOAD_METHOD(self, i):
+    parent = self._stack.pop()
+    self._stack.append(
+      Method(
+        value=getattr(parent.value, i.argval),
+        name=i.argval,
+        parent=parent
+      )
+    )
+
+  def op_LOAD_ATTR(self, i):
+    parent = self._stack.pop()
+    self._stack.append(
+      Attr(value=getattr(parent.value, i.argval), name=i.argval, parent=parent)
+    )
+
+  def op_LOAD_CONST(self, i):
+    self._stack.append(Value(value=i.argval, name=i.argval))
+
+  def _get_args(self, arg_count):
+    if arg_count == 0:
+      args = []
+    else:
+      args = self._stack[-arg_count:]
+      self._stack = self._stack[:-arg_count]
+    return args
+
+  def op_CALL_FUNCTION(self, i):
+    args = self._get_args(i.arg)
+    func = self._stack.pop()
+    self._stack.append(
+      Result(
+        value=func.value(*[a.value for a in args]),
+        args=args,
+        action=func
+      )
+    )
+
+  def op_CALL_METHOD(self, i):
+    args = self._get_args(i.arg)
+    method = self._stack.pop()
+    self._stack.append(
+      Result(
+        value=method.value(*[a.value for a in args]),
+        args=args,
+        action=method
+      )
+    )
+
+  def op_STORE_FAST(self, i):
+    value = self._stack.pop()
+    self._symbols[i.argval] = value.value
+
+  def op_POP_TOP(self, i):
+    self._stack.pop()
+
+  def op_RETURN_VALUE(self, i):
+    self.return_value = self._stack.pop().value
+
+  def op_COMPARE_OP(self, i):
+    right = self._stack.pop()
+    left = self._stack.pop()
+    locals().update(self._symbols)
+    comparisons = {
+      '==': lambda left, right: left == right,
+      'is': lambda left, right: left is right,
+      'is not': lambda left, right: left is not right,
+      'in': lambda left, right: left in right,
+      '>': lambda left, right: left > right,
+      '>=': lambda left, right: left >= right,
+      '<': lambda left, right: left < right,
+      '<=': lambda left, right: left <= right,
+    }
+    value = comparisons[i.argval](left.value, right.value)
+    self._stack.append(
+      Result(
+        value=value,
+        args=(left, right),
+        action=Comparison(code=i.argval)
+      )
+    )
+
+
+class TestCaseBytecodeRunner(BytecodeRunner):
+  CODES = {
+    'is': 'to be',
+  }
+
+  def __init__(self, func):
+    super().__init__(func)
+    self.errors = []
+
+  def op_COMPARE_OP(self, i):
+    super().op_COMPARE_OP(i)
+    c = self._stack[-1]
+    left = c.args[0]
+    right = c.args[1]
+    if c.value is False:
+      self.errors.append(
+        '%s:%d -- Expected %s %s %s' % (
+          self._filename,
+          self._line,
+          left,
+          TestCaseBytecodeRunner.CODES.get(c.action.code, c.action.code),
+          right
+        )
+      )
 
 
 class TestCaseMeta(type):
-  def __new__(cls, name, bases, dct, symbols=None):
-    tests = {k: v for k, v in dct.items() if k.startswith('test')}
-
-    def run_tests(self):
-      for k, v in tests.items():
-        print(k, test(v, symbols))
-
+  def __new__(cls, name, bases, dct, testing=None):
+    if testing:
+      methods = (
+        r[0]
+        for r in inspect.getmembers(testing, predicate=inspect.isroutine)
+        if not r[0].startswith('_')
+      )
+    else:
+      methods = set('test')
     x = super().__new__(cls, name, bases, dct)
-    x.run = run_tests
+    x._tests = {}
+    for m in methods:
+      x._tests.update({k: v for k, v in dct.items() if k.startswith(m)})
+    test_methods = set(k for k in dct.keys() if not k.startswith('_'))
+    if test_methods - set(x._tests.keys()) - {'run', 'setup', 'teardown'}:
+      print('Extra test methods: %s' %
+            ', '.join(test_methods - set(x._tests.keys())))
     return x
 
 
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
+
+  def run(self):
+    failed = 0
+    for k, v in self._tests.items():
+      bcr = TestCaseBytecodeRunner(v)
+      bcr.run()
+      failed += 1 if bcr.errors else 0
+      if failed:
+        print(k)
+        for e in bcr.errors:
+          print(e)
+    sys.exit(failed)
