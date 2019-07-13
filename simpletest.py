@@ -214,35 +214,35 @@ class TestCaseMeta(type):
   def __new__(cls, name, bases, dct, testing=None):
     routines = _get_public_routine_names(testing) if testing else {'test'}
     routines_untested = routines.copy()
-    x = super().__new__(cls, name, bases, dct)
+    test_case = super().__new__(cls, name, bases, dct)
     tests = set()
     for r in routines:
-      test_routines = _get_routines_with_filter(x, r)
+      test_routines = _get_routines_with_filter(test_case, r)
       tests.update(test_routines)
       if test_routines:
         routines_untested.remove(r)
     meta_failures = []
     if testing and routines_untested:
       meta_failures.append(
-        'Untested routines on `%s`: %s' % (
+        'Untested routines on `%s`:\n\t- %s' % (
           testing.__name__,
-          ', '.join(routines_untested)
+          '\n\t- '.join(routines_untested)
         )
       )
-    all_test_routines = _get_public_routine_names(x) or set()
+    all_test_routines = _get_public_routine_names(test_case)
     extra_test_routines = all_test_routines - tests - {
       'run', 'setup', 'teardown',
     }
     if extra_test_routines:
       meta_failures.append(
-        'Extra test routines on `%s`: %s' % (
+        'Extra test routines on `%s`:\n\t- %s' % (
           name,
-          ', '.join(extra_test_routines)
+          '\n\t- '.join(extra_test_routines)
         )
       )
-    x._tests = tests
-    x._meta_failures = meta_failures
-    return x
+    test_case._tests = tests
+    test_case._meta_failures = meta_failures
+    return test_case
 
 
 class TestCase(metaclass=TestCaseMeta):
@@ -255,8 +255,13 @@ class TestCase(metaclass=TestCaseMeta):
     """Called once after each test."""
 
   def run(self):
+    sys.exit(self._run())
+
+  def _run(self):
+    if self._meta_failures:
+      print('Meta Failures %s' % ('*' * 20))
     for e in self._meta_failures:
-      print(e)
+      print('  %s' % e)
     failed = 0
     for k in sorted(self._tests):
       self.setup()
@@ -273,4 +278,4 @@ class TestCase(metaclass=TestCaseMeta):
         print('%s FAILED %s\n' % (k, '*' * 20))
         for e in bcr.errors:
           print('  %s' % e)
-    sys.exit(failed)
+    return failed
