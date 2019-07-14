@@ -15,11 +15,16 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
     ex.negate(True) is None
 
   def add5(self):
+    x = 5
     ex = self.ex
     ex.add5(1) == 6
     ex.add5(2) == 6
     math.pi > ex.add5(1)
     ex.add5(math.pi) in (4, 5)
+    ex.add5(5) / 2 == 4
+    x += ex.add5(4)
+    x == 13
+    ex.add5(1) - 5 == 2
 
   def add5_passes(self):
     self.ex.add5(5) == 10
