@@ -231,22 +231,46 @@ class TestCaseMeta(type):
       )
     all_test_routines = _get_public_routine_names(test_case)
     extra_test_routines = all_test_routines - tests - {
-      'run', 'setup', 'teardown',
+      'run', 'test', 'print', 'setup', 'teardown',
     }
     if extra_test_routines:
       meta_failures.append(
-        'Extra test routines on `%s`:\n\t- %s' % (
-          name,
-          '\n\t- '.join(extra_test_routines)
-        )
+        'Extra test routines:\n\t- %s' % ('\n\t- '.join(extra_test_routines))
       )
+    if meta_failures:
+      print('Meta Failures for `%s` %s' % (name, '*' * 20))
+    for e in meta_failures:
+      print('  %s' % e)
     test_case._tests = tests
-    test_case._meta_failures = meta_failures
+    if 'TestCase' in {b.__name__ for b in bases}:
+      ALL_TEST_CASES[name] = test_case()
     return test_case
+
+
+ALL_TEST_CASES = {}
+
+
+def run_all(runs=1):
+  for k in sorted(ALL_TEST_CASES.keys()):
+    t = ALL_TEST_CASES[k]
+    for _ in range(runs):
+      t.run()
+    print('%s %s %s' % (
+        k,
+        'FAILED' if t.failed else 'PASSED',
+        '*' * 20
+      )
+    )
+    t.print()
 
 
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
+
+  def __init__(self):
+    super().__init__()
+    self.runs = []
+    self.failed = False
 
   def setup(self):
     """Called once before each test."""
@@ -255,27 +279,45 @@ class TestCase(metaclass=TestCaseMeta):
     """Called once after each test."""
 
   def run(self):
-    sys.exit(self._run())
+    run = self.test()
+    self.failed = any(len(m) for m in run.values()) or self.failed
+    self.runs.append(run)
 
-  def _run(self):
-    if self._meta_failures:
-      print('Meta Failures %s' % ('*' * 20))
-    for e in self._meta_failures:
-      print('  %s' % e)
-    failed = 0
-    for k in sorted(self._tests):
+  def print(self):
+    for r, run in enumerate(self.runs):
+      if len(self.runs) > 1:
+        print('Run %d / %d' % (r + 1, len(self.runs)))
+      for k in sorted(run.keys()):
+        result = run[k]
+        results_prev = set()
+        for pr in range(r):
+          results_prev = results_prev.union(self.runs[pr][k])
+        print('%s %s %s\n' % (
+            k,
+            'FAILED' if len(result) else 'PASSED',
+            '*' * 20
+          )
+        )
+        if len(result):
+          unique_errors = [e for e in result if e not in results_prev]
+          repeat_error_count = len(result) - len(unique_errors)
+          if repeat_error_count:
+            print('  %d previous errors were repeated\n' % repeat_error_count)
+          for e in unique_errors:
+            print('  %s' % e)
+
+  def test(self):
+    results = {}
+    for t in self._tests:
       self.setup()
-      f = getattr(self, k)
+      f = getattr(self, t)
       bcr = TestCaseBytecodeRunner(f)
+      errors = []
       try:
         bcr.run()
       except Exception as e:
-        failed += 1
-        print(e)
-      self.teardown()
-      failed += 1 if bcr.errors else 0
-      if failed:
-        print('%s FAILED %s\n' % (k, '*' * 20))
-        for e in bcr.errors:
-          print('  %s' % e)
-    return failed
+        errors.append(e)
+      finally:
+        results[t] = bcr.errors + errors
+        self.teardown()
+    return results
