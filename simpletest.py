@@ -251,6 +251,7 @@ ALL_TEST_CASES = {}
 
 
 def run_all(runs=1):
+  fail_count = 0
   for k in sorted(ALL_TEST_CASES.keys()):
     t = ALL_TEST_CASES[k]
     for _ in range(runs):
@@ -261,7 +262,9 @@ def run_all(runs=1):
         '*' * 20
       )
     )
+    fail_count += 1 if t.failed else 0
     t.print()
+  sys.exit(fail_count)
 
 
 class TestCase(metaclass=TestCaseMeta):
