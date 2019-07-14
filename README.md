@@ -17,15 +17,29 @@ math.pi <= 3
 Yes, the above snippet works. The current output from this expectation is:
 
 ```sh
-pi_test.py:17 -- Expected math.pi <= 3
-testPiValue -- Test failed 1 comparison.
+example_test.py:31 --
+	math.pi <3.141592653589793>
+	  was not less than
+	3
 ```
 
-Ideally, output would also include the actual value:
+A more complex example would be:
+
+```py
+x = 5
+# (multi-)line gap
+x += ex.add5(4)
+# (multi-)line gap
+x == 13
+```
+
+The output for this is:
 
 ```sh
-pi_test.py:17 -- Expected math.pi <= 3 (but was 3.141592653589793)
-testPiValue -- Test failed 1 comparison.
+example_test.py:26 --
+  (5)+(ex.add5(4) <9>) <14>
+  	was not equal to
+  13
 ```
 
 ## How it works
