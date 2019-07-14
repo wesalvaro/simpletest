@@ -135,6 +135,116 @@ class BytecodeRunner(object):
   def op_POP_TOP(self, i):
     self._stack.pop()
 
+  def op_ROT_TWO(self, i):
+    tos = self._stack.pop()
+    tos1 = self._stack.pop()
+    self._stack.append(tos, tos1)
+
+  def op_ROT_THREE(self, i):
+    tos = self._stack.pop()
+    tos1 = self._stack.pop()
+    tos2 = self._stack.pop()
+    self._stack.append(tos, tos2, tos1)
+
+  def op_ROT_FOUR(self, i):
+    tos = self._stack.pop()
+    tos1 = self._stack.pop()
+    tos2 = self._stack.pop()
+    tos3 = self._stack.pop()
+    self._stack.append(tos, tos3, tos2, tos1)
+
+  def op_DUP_TOP(self, i):
+    self._stack.append(self._stack[-1])
+
+  def _binary_op(self, op_func, op_symbol, op_symbol_end=''):
+    tos = self._stack.pop()
+    tos1 = self._stack.pop()
+    self._stack.append(Value(
+      value=op_func(tos1.value, tos.value),
+      name='(%s)%s(%s)%s' % (tos1, op_symbol, tos, op_symbol_end)
+    ))
+
+  def op_BINARY_POWER(self, i):
+    self._binary_op(lambda l, r: l**r, '**')
+
+  def op_BINARY_MULTIPLY(self, i):
+    self._binary_op(lambda l, r: l * r, '*')
+
+  def op_BINARY_DIVIDE(self, i):
+    raise NotImplementedError('Only true divide is supported')
+
+  def op_BINARY_FLOOR_DIVIDE(self, i):
+    self._binary_op(lambda l, r: l // r, '//')
+
+  def op_BINARY_TRUE_DIVIDE(self, i):
+    self._binary_op(lambda l, r: l / r, '/')
+
+  def op_BINARY_MODULO(self, i):
+    self._binary_op(lambda l, r: l % r, '%')
+
+  def op_BINARY_ADD(self, i):
+    self._binary_op(lambda l, r: l + r, '+')
+
+  def op_BINARY_SUBTRACT(self, i):
+    self._binary_op(lambda l, r: l - r, '-')
+
+  def op_BINARY_SUBSCR(self, i):
+    self._binary_op(lambda l, r: l[r], '[', op_symbol_end=']')
+
+  def op_BINARY_LSHIFT(self, i):
+    self._binary_op(lambda l, r: l << r, '')
+
+  def op_BINARY_RSHIFT(self, i):
+    self._binary_op(lambda l, r: l >> r, '')
+
+  def op_BINARY_AND(self, i):
+    self._binary_op(lambda l, r: l & r, '')
+
+  def op_BINARY_XOR(self, i):
+    self._binary_op(lambda l, r: l ^ r, '')
+
+  def op_BINARY_OR(self, i):
+    self._binary_op(lambda l, r: l | r, '')
+
+  def op_INPLACE_POWER(self, i):
+    self.op_BINARY_POWER(i)
+
+  def op_INPLACE_MULTIPLY(self, i):
+    self.op_BINARY_MULTIPLY(i)
+
+  def op_INPLACE_DIVIDE(self, i):
+    self.op_BINARY_DIVIDE(i)
+
+  def op_INPLACE_FLOOR_DIVIDE(self, i):
+    self.op_BINARY_FLOOR_DIVIDE(i)
+
+  def op_INPLACE_TRUE_DIVIDE(self, i):
+    self.op_BINARY_TRUE_DIVIDE(i)
+
+  def op_INPLACE_MODULO(self, i):
+    self.op_BINARY_MODULO(i)
+
+  def op_INPLACE_ADD(self, i):
+    self.op_BINARY_ADD(i)
+
+  def op_INPLACE_SUBTRACT(self, i):
+    self.op_BINARY_SUBTRACT(i)
+
+  def op_INPLACE_LSHIFT(self, i):
+    self.op_BINARY_LSHIFT(i)
+
+  def op_INPLACE_RSHIFT(self, i):
+    self.op_BINARY_RSHIFT(i)
+
+  def op_INPLACE_AND(self, i):
+    self.op_BINARY_AND(i)
+
+  def op_INPLACE_XOR(self, i):
+    self.op_BINARY_XOR(i)
+
+  def op_INPLACE_OR(self, i):
+    self.op_BINARY_OR(i)
+
   def op_RETURN_VALUE(self, i):
     self.return_value = self._stack.pop().value
 
