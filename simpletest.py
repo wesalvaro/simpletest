@@ -6,7 +6,11 @@ import inspect
 import sys
 
 
-class Value(object):
+class StackObject(object):
+  """Object to store on the stack."""
+
+
+class Value(StackObject):
   def __init__(self, value, name):
     self.value, self.name = value, name
 
@@ -19,7 +23,7 @@ class Value(object):
       return '%s <%s>' % (self.name, self.value)
 
 
-class Result(object):
+class Result(StackObject):
   def __init__(self, value, args, action):
     self.value, self.args, self.action = value, args, action
 
@@ -34,7 +38,7 @@ class Result(object):
 Comparison = collections.namedtuple('Comparison', ['code'])
 
 
-class Method(object):
+class Method(StackObject):
   def __init__(self, value, name, parent):
     self.value, self.name, self.parent = value, name, parent
 
@@ -42,7 +46,7 @@ class Method(object):
     return '%s.%s' % (self.parent.name, self.name,)
 
 
-class Attr(object):
+class Attr(StackObject):
   def __init__(self, value, name, parent):
     self.value, self.name, self.parent = value, name, parent
 
@@ -51,8 +55,10 @@ class Attr(object):
 
 
 class BytecodeRunner(object):
+  """Executes a function's disassembled bytecode instructions.
 
   See: https://docs.python.org/2.4/lib/bytecodes.html
+  """
 
   def __init__(self, func):
     bc = dis.Bytecode(func)
@@ -79,7 +85,10 @@ class BytecodeRunner(object):
     self._stack.append(Value(value=self._symbols[i.argval], name=i.argval))
 
   def op_LOAD_FAST(self, i):
-    self._stack.append(Value(value=self._symbols[i.argval], name=i.argval))
+    value = self._symbols[i.argval]
+    if not isinstance(value, StackObject):
+      value = Value(value=value, name=i.argval)
+    self._stack.append(value)
 
   def op_LOAD_METHOD(self, i):
     parent = self._stack.pop()
@@ -132,7 +141,7 @@ class BytecodeRunner(object):
 
   def op_STORE_FAST(self, i):
     value = self._stack.pop()
-    self._symbols[i.argval] = value.value
+    self._symbols[i.argval] = value
 
   def op_POP_TOP(self, i):
     self._stack.pop()
@@ -253,7 +262,6 @@ class BytecodeRunner(object):
   def op_COMPARE_OP(self, i):
     right = self._stack.pop()
     left = self._stack.pop()
-    locals().update(self._symbols)
     comparisons = {
       '==': lambda left, right: left == right,
       'is': lambda left, right: left is right,
