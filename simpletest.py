@@ -52,6 +52,8 @@ class Attr(object):
 
 class BytecodeRunner(object):
 
+  See: https://docs.python.org/2.4/lib/bytecodes.html
+
   def __init__(self, func):
     bc = dis.Bytecode(func)
     self._instructions = (i for i in bc)
