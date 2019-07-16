@@ -70,7 +70,7 @@ class BytecodeRunner(object):
   See: https://docs.python.org/2.4/lib/bytecodes.html
   """
 
-  def __init__(self, func):
+  def __init__(self, func, context=None):
     bc = dis.Bytecode(func)
     self._instructions = (i for i in bc)
     self._filename = bc.codeobj.co_filename
@@ -78,8 +78,10 @@ class BytecodeRunner(object):
     self._symbols = {}
     self._stack = []
     self._symbols.update(func.__globals__)
-    if getattr(func, '__self__', None):
+    if hasattr(func, '__self__'):
       self._symbols.update({'self': func.__self__})
+    elif context:
+      self._symbols.update({'self': context})
     self.return_value = sentinel.NOT_RUN
 
   def run(self):
