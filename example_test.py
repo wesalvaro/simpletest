@@ -34,4 +34,4 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
 
 
 if __name__ == '__main__':
-  simpletest.run_all(runs=2)
+  simpletest.main(runs=2)

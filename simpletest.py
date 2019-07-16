@@ -90,7 +90,7 @@ class TestCaseMeta(type):
 ALL_TEST_CASES = {}
 
 
-def run_all(runs=1):
+def main(runs=1):
   fail_count = 0
   for k in sorted(ALL_TEST_CASES.keys()):
     t = ALL_TEST_CASES[k]
