@@ -66,6 +66,7 @@ class TestCaseMeta(type):
       tests.update(test_routines)
       if test_routines:
         routines_untested.remove(r)
+    methods_to_ignore = dct.get('IGNORE_METHODS', set())
     meta_failures = []
     if testing and routines_untested:
       meta_failures.append(
@@ -75,10 +76,12 @@ class TestCaseMeta(type):
         )
       )
     all_test_routines = _get_public_routine_names(test_case)
-    extra_test_routines = all_test_routines - tests - dct.get('__IGNORE_METHODS', set())
+    for b in bases:
+      methods_to_ignore = methods_to_ignore.union(b.__dict__.get('IGNORE_METHODS', set()))
+    extra_test_routines = all_test_routines - tests - methods_to_ignore
     if extra_test_routines:
       meta_failures.append(
-        'Extra test routines:\n\t- %s' % ('\n\t- '.join(extra_test_routines))
+        'Extra test routines:\n\t- %s' % ('\n\t- '.join(sorted(extra_test_routines)))
       )
     if meta_failures:
       print('Meta Failures for `%s` %s' % (name, '*' * 20))
@@ -114,8 +117,8 @@ TestResult = collections.namedtuple('TestResult', ('errors', 'check_count'))
 
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
-  __IGNORE_METHODS = {
-    'run', 'test', 'print', 'setup', 'teardown',
+  IGNORE_METHODS = {
+    'runTest', 'setUp', 'tearDown',
   }
 
   def __init__(self):
