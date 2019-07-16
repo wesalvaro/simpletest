@@ -72,9 +72,7 @@ class TestCaseMeta(type):
         )
       )
     all_test_routines = _get_public_routine_names(test_case)
-    extra_test_routines = all_test_routines - tests - {
-      'run', 'test', 'print', 'setup', 'teardown',
-    }
+    extra_test_routines = all_test_routines - tests - dct.get('__IGNORE_METHODS', set())
     if extra_test_routines:
       meta_failures.append(
         'Extra test routines:\n\t- %s' % ('\n\t- '.join(extra_test_routines))
@@ -111,6 +109,9 @@ def run_all(runs=1):
 
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
+  __IGNORE_METHODS = {
+    'run', 'test', 'print', 'setup', 'teardown',
+  }
 
   def __init__(self):
     super().__init__()
