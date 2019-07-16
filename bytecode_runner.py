@@ -288,6 +288,9 @@ class BytecodeRunner(object):
   def op_BUILD_TUPLE(self, i):
     self._build_iterable(tuple, i.arg, '(', ')')
 
+  def op_BUILD_SET(self, i):
+    self._build_iterable(set, i.arg, '{', '}')
+
   def op_COMPARE_OP(self, i):
     right = self._stack.pop()
     left = self._stack.pop()
