@@ -28,13 +28,18 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
     right = c.args[1]
     self.check_count += 1
     if c.value is False:
+      extra_info = None
+      if type(left.value) == list and type(right.value) == list:
+        if set(left.value) == set(right.value):
+          extra_info = 'lists were equal when order was ignored'
       self.errors.append(
-        '%s:%d -- \n\t%s\n\t  %s\n\t%s\n' % (
+        '%s:%d -- \n\t%s\n\t  %s\n\t%s\n%s' % (
           self._filename,
           self._line,
           left,
           TestCaseBytecodeRunner.CODES.get(c.action.code, c.action.code),
-          right
+          right,
+          ('\t(%s)\n' % extra_info) if extra_info else '',
         )
       )
 

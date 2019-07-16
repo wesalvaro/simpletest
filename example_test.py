@@ -25,6 +25,8 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
     x += ex.add5(4)
     x == 13
     ex.add5(1) - 5 == 2
+    [1, 6] == [ex.add5(1), 1]
+    (2,3) == (3,ex.add5(2))
 
   def add5_passes(self):
     self.ex.add5(5) == 10
