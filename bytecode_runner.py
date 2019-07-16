@@ -22,7 +22,7 @@ class Value(StackObject):
     elif isinstance(self.value, types.ModuleType):
       return str(self.name)
     elif is_printable(self.value):
-      return '%s <%s>' % (self.name, self.value)
+      return '%s=%s' % (self.value, self.name)
     else:
       return str(self.name)
 
@@ -33,10 +33,10 @@ class Result(StackObject):
 
   def __str__(self):
     if is_printable(self.value):
-      return '%s(%s) <%s>' % (
+      return '%s=%s(%s)' % (
+        self.value,
         self.action,
         ', '.join(str(a) for a in self.args),
-        self.value
       )
     else:
       return '%s(%s)' % (self.action, ', '.join(str(a) for a in self.args))
@@ -59,7 +59,7 @@ class Attr(StackObject):
 
   def __str__(self):
     if (is_printable(self.value)):
-      return '%s.%s <%s>' % (self.parent, self.name, self.value)
+      return '%s=%s.%s' % (self.value, self.parent, self.name)
     else:
       return '%s.%s' % (self.parent, self.name)
 
