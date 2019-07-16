@@ -1,3 +1,4 @@
+import collections
 import inspect
 import sys
 
@@ -17,6 +18,7 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
 
   def __init__(self, func):
     super().__init__(func)
+    self.check_count = 0
     self.errors = []
 
   def op_COMPARE_OP(self, i):
@@ -24,6 +26,7 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
     c = self._stack[-1]
     left = c.args[0]
     right = c.args[1]
+    self.check_count += 1
     if c.value is False:
       self.errors.append(
         '%s:%d -- \n\t%s\n\t  %s\n\t%s\n' % (
@@ -107,6 +110,8 @@ def main(runs=1):
   sys.exit(fail_count)
 
 
+TestResult = collections.namedtuple('TestResult', ('errors', 'check_count'))
+
 class TestCase(metaclass=TestCaseMeta):
   """Base test case."""
   __IGNORE_METHODS = {
@@ -134,19 +139,21 @@ class TestCase(metaclass=TestCaseMeta):
       if len(self.runs) > 1:
         print('Run %d / %d' % (r + 1, len(self.runs)))
       for k in sorted(run.keys()):
-        result = run[k]
+        errors, check_count = run[k]
         results_prev = set()
         for pr in range(r):
-          results_prev = results_prev.union(self.runs[pr][k])
-        print('%s %s %s\n' % (
+          results_prev = results_prev.union(self.runs[pr][k].errors)
+        print('%s %s (%d/%d OK) %s\n' % (
             k,
-            'FAILED' if len(result) else 'PASSED',
+            'FAILED' if len(errors) else 'PASSED',
+            check_count - len(errors),
+            check_count,
             '*' * 20
           )
         )
-        if len(result):
-          unique_errors = [e for e in result if e not in results_prev]
-          repeat_error_count = len(result) - len(unique_errors)
+        if len(errors):
+          unique_errors = [e for e in errors if e not in results_prev]
+          repeat_error_count = len(errors) - len(unique_errors)
           if repeat_error_count:
             print('  %d previous errors were repeated\n' % repeat_error_count)
           for e in unique_errors:
@@ -164,6 +171,7 @@ class TestCase(metaclass=TestCaseMeta):
       except Exception as e:
         errors.append(e)
       finally:
-        results[t] = bcr.errors + errors
-        self.teardown()
+        errors = bcr.errors + errors
+      results[t] = TestResult(errors=errors, check_count=bcr.check_count)
+      self.teardown()
     return results
