@@ -8,6 +8,10 @@ class StackObject(object):
   """Object to store on the stack."""
 
 
+def is_printable(obj):
+  return isinstance(obj, (int, str, float, complex, tuple, list, dict, set, StackObject))
+
+
 class Value(StackObject):
   def __init__(self, value, name):
     self.value, self.name = value, name
@@ -17,8 +21,10 @@ class Value(StackObject):
       return str(self.value)
     elif isinstance(self.value, types.ModuleType):
       return str(self.name)
-    else:
+    elif is_printable(self.value):
       return '%s <%s>' % (self.name, self.value)
+    else:
+      return str(self.name)
 
 
 class Result(StackObject):
@@ -26,11 +32,14 @@ class Result(StackObject):
     self.value, self.args, self.action = value, args, action
 
   def __str__(self):
-    return '%s(%s) <%s>' % (
-      self.action,
-      ', '.join(str(a) for a in self.args),
-      self.value
-    )
+    if is_printable(self.value):
+      return '%s(%s) <%s>' % (
+        self.action,
+        ', '.join(str(a) for a in self.args),
+        self.value
+      )
+    else:
+      return '%s(%s)' % (self.action, ', '.join(str(a) for a in self.args))
 
 
 Comparison = collections.namedtuple('Comparison', ['code'])
@@ -49,7 +58,10 @@ class Attr(StackObject):
     self.value, self.name, self.parent = value, name, parent
 
   def __str__(self):
-    return '%s.%s <%s>' % (self.parent, self.name, self.value)
+    if (is_printable(self.value)):
+      return '%s.%s <%s>' % (self.parent, self.name, self.value)
+    else:
+      return '%s.%s' % (self.parent, self.name)
 
 
 class BytecodeRunner(object):
