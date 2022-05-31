@@ -57,11 +57,10 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
     if c.value:
       self.checkPass()
     else:
+      extra_info = None
       if type(left.value) == list and type(right.value) == list:
         if set(left.value) == set(right.value):
           extra_info = 'lists were equal when order was ignored'
-      else:
-        extra_info = None
       self.checkFail('%s\n\t  %s\n\t%s%s' % (
           left,
           TestCaseBytecodeRunner.CODES.get(c.action.code, c.action.code),
