@@ -20,51 +20,53 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
     self.check_count = 0
     self.errors = []
 
+  def checkPass(self):
+    self.check_count += 1
+
+  def checkFail(self, message):
+    self.check_count += 1
+    self.errors.append(
+      '%s:%d -- \n\t%s\n' % (
+        os.path.relpath(self._filename),
+        self._line,
+        message,
+      )
+    )
+
   def op_IS_OP(self, invert):
     super().op_IS_OP(invert)
     c = self._stack[-1]
-    self.check_count += 1
-    if c.value is False:
-      self.errors.append(
-        '%s:%d -- \n\t%s\n' % (
-          os.path.relpath(self._filename),
-          self._line,
-          c.name,
-        )
-      )
+    if c.value:
+      self.checkPass()
+    else:
+      self.checkFail(c.name)
 
   def op_CONTAINS_OP(self, invert):
     super().op_CONTAINS_OP(invert)
     c = self._stack[-1]
-    self.check_count += 1
-    if c.value is False:
-      self.errors.append(
-        '%s:%d -- \n\t%s\n' % (
-          os.path.relpath(self._filename),
-          self._line,
-          c.name,
-        )
-      )
+    if c.value:
+      self.checkPass()
+    else:
+      self.checkFail(c.name)
 
   def op_COMPARE_OP(self, i):
     super().op_COMPARE_OP(i)
     c = self._stack[-1]
     left = c.args[0]
     right = c.args[1]
-    self.check_count += 1
-    if c.value is False:
-      extra_info = None
+    if c.value:
+      self.checkPass()
+    else:
       if type(left.value) == list and type(right.value) == list:
         if set(left.value) == set(right.value):
           extra_info = 'lists were equal when order was ignored'
-      self.errors.append(
-        '%s:%d -- \n\t%s\n\t  %s\n\t%s\n%s' % (
-          os.path.relpath(self._filename),
-          self._line,
+      else:
+        extra_info = None
+      self.checkFail('%s\n\t  %s\n\t%s%s' % (
           left,
           TestCaseBytecodeRunner.CODES.get(c.action.code, c.action.code),
           right,
-          ('\t(%s)\n' % extra_info) if extra_info else '',
+          ('\n\t(%s)' % extra_info) if extra_info else '',
         )
       )
 
