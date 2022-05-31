@@ -1,6 +1,7 @@
 import collections
 import inspect
 import sys
+import os
 
 import bytecode_runner
 
@@ -34,7 +35,7 @@ class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
           extra_info = 'lists were equal when order was ignored'
       self.errors.append(
         '%s:%d -- \n\t%s\n\t  %s\n\t%s\n%s' % (
-          self._filename,
+          os.path.relpath(self._filename),
           self._line,
           left,
           TestCaseBytecodeRunner.CODES.get(c.action.code, c.action.code),
