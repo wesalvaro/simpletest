@@ -9,18 +9,42 @@ import bytecode_runner
 class TestCaseBytecodeRunner(bytecode_runner.BytecodeRunner):
   CODES = {
     '==': 'was not equal to',
-    'is': 'was not',
     '>': 'was not greater than',
     '>=': 'was not greater than or equal to',
     '<': 'was not less than',
     '<=': 'was not less than or equal to',
-    'in': 'was not contained in',
   }
 
   def __init__(self, func):
     super().__init__(func)
     self.check_count = 0
     self.errors = []
+
+  def op_IS_OP(self, invert):
+    super().op_IS_OP(invert)
+    c = self._stack[-1]
+    self.check_count += 1
+    if c.value is False:
+      self.errors.append(
+        '%s:%d -- \n\t%s\n' % (
+          os.path.relpath(self._filename),
+          self._line,
+          c.name,
+        )
+      )
+
+  def op_CONTAINS_OP(self, invert):
+    super().op_CONTAINS_OP(invert)
+    c = self._stack[-1]
+    self.check_count += 1
+    if c.value is False:
+      self.errors.append(
+        '%s:%d -- \n\t%s\n' % (
+          os.path.relpath(self._filename),
+          self._line,
+          c.name,
+        )
+      )
 
   def op_COMPARE_OP(self, i):
     super().op_COMPARE_OP(i)

@@ -12,6 +12,7 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
     ex.negate(True) is False
     ex.negate(False) is not None
     ex.negate(False) is False
+    ex.negate(False) is not True
     ex.negate(True) is None
 
   def add5(self):
@@ -20,7 +21,8 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
     ex.add5(1) == 6
     ex.add5(2) == 6
     math.pi > ex.add5(1)
-    ex.add5(math.pi) in (4, 5)
+    ex.add5(1) in (4, 5)
+    ex.add5(0) not in (4, 5)
     ex.add5(5) / 2 == 4
     x += ex.add5(4)
     x == 13

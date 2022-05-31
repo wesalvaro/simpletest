@@ -292,19 +292,28 @@ class BytecodeRunner(object):
     self._build_iterable(set, i.arg, '{', '}')
 
   def op_IS_OP(self, invert):
-    self._binary_op(lambda x, y: x is y, 'is')
+    if invert.arg:
+      func = lambda x, y: x is not y
+      negate = 'not '
+    else:
+      func = lambda x, y: x is y
+      negate = ''
+    self._binary_op(func, ' is ' + negate)
 
   def op_CONTAINS_OP(self, invert):
-    self._binary_op(lambda x, y: x in y, 'in')
+    if invert.arg:
+      func = lambda x, y: x not in y
+      negate = ' not'
+    else:
+      func = lambda x, y: x in y
+      negate = ''
+    self._binary_op(func, negate + ' in ')
 
   def op_COMPARE_OP(self, i):
     right = self._stack.pop()
     left = self._stack.pop()
     comparisons = {
       '==': lambda left, right: left == right,
-      'is': lambda left, right: left is right,
-      'is not': lambda left, right: left is not right,
-      'in': lambda left, right: left in right,
       '>': lambda left, right: left > right,
       '>=': lambda left, right: left >= right,
       '<': lambda left, right: left < right,
