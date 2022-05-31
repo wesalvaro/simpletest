@@ -270,7 +270,7 @@ class BytecodeRunner(object):
 
   def op_RETURN_VALUE(self, i):
     self.return_value = self._stack.pop().value
-  
+
   def _build_iterable(self, iter_func, iter_size, symbol_start, symbol_end):
     iter_values = self._get_args(iter_size)
     all_same = all(str(v.value) == str(v) for v in iter_values)
@@ -281,15 +281,21 @@ class BytecodeRunner(object):
       symbol_end,
     )
     self._stack.append(Value(value=iter_result, name=iter_name))
-  
+
   def op_BUILD_LIST(self, i):
     self._build_iterable(list, i.arg, '[', ']')
-  
+
   def op_BUILD_TUPLE(self, i):
     self._build_iterable(tuple, i.arg, '(', ')')
 
   def op_BUILD_SET(self, i):
     self._build_iterable(set, i.arg, '{', '}')
+
+  def op_IS_OP(self, invert):
+    self._binary_op(lambda x, y: x is y, 'is')
+
+  def op_CONTAINS_OP(self, invert):
+    self._binary_op(lambda x, y: x in y, 'in')
 
   def op_COMPARE_OP(self, i):
     right = self._stack.pop()
