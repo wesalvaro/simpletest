@@ -26,6 +26,9 @@ class Value(StackObject):
     else:
       return str(self.name)
 
+  def __repr__(self):
+    return "Value=" + str(self)
+
 
 class Result(StackObject):
   def __init__(self, value, args, action):
