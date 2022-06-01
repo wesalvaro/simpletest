@@ -132,6 +132,19 @@ class BytecodeRunner(object):
       self._stack = self._stack[:-arg_count]
     return args
 
+  def _get_kwargs(self, arg_count):
+    if arg_count == 0:
+      kwargs = {}
+      args = []
+    else:
+      kwarg_names = self._stack.pop().value
+      kwarg_count = len(kwarg_names)
+      kwarg_values = self._stack[-kwarg_count:]
+      kwargs = dict(zip(kwarg_names, kwarg_values))
+      args = self._stack[-arg_count:-arg_count+kwarg_count]
+      self._stack = self._stack[:-arg_count]
+    return args, kwargs
+
   def op_CALL_FUNCTION(self, i):
     args = self._get_args(i.arg)
     func = self._stack.pop()
@@ -139,7 +152,20 @@ class BytecodeRunner(object):
       Result(
         value=func.value(*[a.value for a in args]),
         args=args,
-        action=func
+        action=func,
+      )
+    )
+
+  def op_CALL_FUNCTION_KW(self, i):
+    (args, kwargs) = self._get_kwargs(i.arg)
+    func = self._stack.pop()
+    real_args = [a.value for a in args]
+    real_kwargs = {k: v.value for (k, v) in kwargs.items()}
+    self._stack.append(
+      Result(
+        value=func.value(*real_args, **real_kwargs),
+        args=args + [k + "=" + str(v) for (k, v) in kwargs.items()],
+        action=func,
       )
     )
 
@@ -150,7 +176,7 @@ class BytecodeRunner(object):
       Result(
         value=method.value(*[a.value for a in args]),
         args=args,
-        action=method
+        action=method,
       )
     )
 

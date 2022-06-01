@@ -37,6 +37,12 @@ class ExampleTest(simpletest.TestCase, testing=example.Example):
   def extra_test_method(self):
     """This method is not named correctly for testing example.Example"""
 
+  def kwarguments(self):
+    ex = self.ex
+    ex.kwarguments(3) == 5
+    ex.kwarguments(3, b=1) == 6
+    ex.kwarguments(3, c=1) == 4
+
 
 if __name__ == '__main__':
   simpletest.main(runs=2)
